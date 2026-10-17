@@ -16,7 +16,10 @@
  * variations do not need to be handled.
  */
 package course;
-
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
+import java.time.format.ResolverStyle;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -166,23 +169,39 @@ public class Course {
         return true;    // TODO (Sadman): implement Condition 7
     }
 
-    // =====================================================================
+      // =====================================================================
     // Member 3 - Sumaya Sanjida Sarna: Conditions 8, 9, 10, 11
-    // TODO (Sumaya): replace each placeholder body with the real check.
-    // Each currently returns true so the all-valid tests can run meanwhile.
     // =====================================================================
+
+    // The date format from the spec. STRICT makes Java reject dates that
+    // don't exist, like 29/02/2027 or 31/04/2026, instead of fixing them.
+    private static final DateTimeFormatter DATE_FORMAT =
+            DateTimeFormatter.ofPattern("dd/MM/uuuu HH:mm").withResolverStyle(ResolverStyle.STRICT);
 
     /**
      * Condition 8: assessments are either individual or group. If it is a group
      * assessment, the grouping name must be provided.
      */
     private boolean isGroupingNameProvidedForGroup(boolean group, String groupingName) {
-        return true;    // TODO (Sumaya): implement Condition 8
+        if (group) {
+            // a group assessment needs a real grouping name, not empty or just spaces
+            return groupingName != null && !groupingName.trim().isEmpty();
+        }
+        return true;    // individual assessments don't need one
     }
 
     /** Condition 9: the grouping name must be unique for each assessment. */
     private boolean isGroupingNameUnique(boolean group, String groupingName) {
-        return true;    // TODO (Sumaya): implement Condition 9
+        if (!group) {
+            return true;    // nothing to compare for an individual assessment
+        }
+        // I only compare with other group assessments, since individual ones use ""
+        for (Assessment existing : assessments) {
+            if (existing.isGroup() && existing.getGroupingName().equals(groupingName)) {
+                return false;
+            }
+        }
+        return true;
     }
 
     /**
@@ -192,7 +211,10 @@ public class Course {
      */
     private boolean areDateTimesValid(String publishDateTime, String dueDateTime,
                                       String hideDateTime) {
-        return true;    // TODO (Sumaya): implement Condition 10
+        // all three dates have to be real dates in the right format
+        return toDateTime(publishDateTime) != null
+                && toDateTime(dueDateTime) != null
+                && toDateTime(hideDateTime) != null;
     }
 
     /**
@@ -201,6 +223,23 @@ public class Course {
      */
     private boolean areDateTimesInOrder(String publishDateTime, String dueDateTime,
                                         String hideDateTime) {
-        return true;    // TODO (Sumaya): implement Condition 11
+        LocalDateTime publish = toDateTime(publishDateTime);
+        LocalDateTime due = toDateTime(dueDateTime);
+        LocalDateTime hide = toDateTime(hideDateTime);
+
+        // isAfter means strictly later, so two equal times fail
+        return due.isAfter(publish) && hide.isAfter(due);
+    }
+
+    /** Turns the text into a date and time, or gives back null if it isn't valid. */
+    private LocalDateTime toDateTime(String dateTime) {
+        if (dateTime == null) {
+            return null;
+        }
+        try {
+            return LocalDateTime.parse(dateTime, DATE_FORMAT);
+        } catch (DateTimeParseException e) {
+            return null;    // wrong format or a date that doesn't exist
+        }
     }
 }
