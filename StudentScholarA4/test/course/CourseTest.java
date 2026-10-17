@@ -249,9 +249,164 @@ class CourseTest {
 
     // =========================================================================
     // Member 3 - Sumaya Sanjida Sarna: Test Cases 9-12 (Conditions 8, 9, 10, 11)
-    // TODO (Sumaya): one @Test per condition with one boundary test data each,
-    // except Test Cases 11 and 12 (Conditions 10 and 11), which need two each.
     // =========================================================================
+
+    /*
+     * Test Case 9 - group assessment with no grouping name (Condition 8).
+     * Test data: "" (an empty grouping name) for a group assessment.
+     * An empty string is the boundary, since it's the shortest name possible.
+     * Expected result: false, and nothing is added.
+     */
+    @Test
+    @DisplayName("Test Case 9: group assessment with an empty grouping name is rejected (Condition 8)")
+    void groupWithoutGroupingNameIsRejected() {
+        // Setup
+        String emptyGroupingName = "";
+
+        // Precondition
+        assertTrue(course.getAssessments().isEmpty(), "Precondition: course should start empty");
+        assertEquals(0, emptyGroupingName.length(), "Precondition: grouping name should be empty");
+
+        // Call - group is true, everything else is valid
+        boolean result = course.createNewAssessment(VALID_NAME, VALID_DESCRIPTION, VALID_POINTS,
+                VALID_SUBMISSION_TYPE, true, emptyGroupingName, VALID_PUBLISH, VALID_DUE, VALID_HIDE);
+
+        // Assertion
+        assertFalse(result, "A group assessment with no grouping name should return false");
+        assertTrue(course.getAssessments().isEmpty(), "No assessment should be stored");
+    }
+
+    /*
+     * Test Case 10 - grouping name already used (Condition 9).
+     * Test data: "lab teams", the same grouping name as a group assessment
+     * that is already in the course.
+     * Expected result: false. Nothing is added and the first assessment stays the same.
+     */
+    @Test
+    @DisplayName("Test Case 10: duplicate grouping name is rejected (Condition 9)")
+    void duplicateGroupingNameIsRejected() {
+        // Setup - add a group assessment that uses "lab teams"
+        assertTrue(course.createNewAssessment("lab one", VALID_DESCRIPTION, VALID_POINTS,
+                VALID_SUBMISSION_TYPE, true, "lab teams", VALID_PUBLISH, VALID_DUE, VALID_HIDE),
+                "Setup: first group assessment should be added");
+        Assessment existing = course.getAssessments().get(0);
+
+        // Precondition
+        assertEquals(1, course.getAssessments().size(), "Precondition: course should hold one assessment");
+        assertEquals("lab teams", existing.getGroupingName(), "Precondition: grouping name should already be taken");
+
+        // Call - different name, same grouping name
+        boolean result = course.createNewAssessment("lab two", VALID_DESCRIPTION, VALID_POINTS,
+                VALID_SUBMISSION_TYPE, true, "lab teams", VALID_PUBLISH, VALID_DUE, VALID_HIDE);
+
+        // Assertion
+        assertFalse(result, "A duplicate grouping name should return false");
+        assertEquals(1, course.getAssessments().size(), "No new assessment should be stored");
+        assertSame(existing, course.getAssessments().get(0), "The first assessment should still be stored");
+        assertAttributes(existing, "lab one", VALID_DESCRIPTION, VALID_POINTS, VALID_SUBMISSION_TYPE,
+                true, "lab teams", VALID_PUBLISH, VALID_DUE, VALID_HIDE);
+    }
+
+    /*
+     * Test Case 11 - date that doesn't exist (Condition 10, test data 1 of 2).
+     * Test data: publish date "29/02/2027 09:00". The format looks right,
+     * but 2027 is not a leap year, so 29 February doesn't exist.
+     * Expected result: false, and nothing is added.
+     */
+    @Test
+    @DisplayName("Test Case 11 (data 1/2): 29 February in a non-leap year is rejected (Condition 10)")
+    void nonLeapYearDateIsRejected() {
+        // Setup
+        String publish = "29/02/2027 09:00";
+        String due = "15/03/2027 23:59";
+        String hide = "22/03/2027 23:59";
+
+        // Precondition
+        assertTrue(course.getAssessments().isEmpty(), "Precondition: course should start empty");
+        assertEquals(16, publish.length(), "Precondition: date should have the DD/MM/YYYY hh:mm length");
+
+        // Call
+        boolean result = course.createNewAssessment(VALID_NAME, VALID_DESCRIPTION, VALID_POINTS,
+                VALID_SUBMISSION_TYPE, VALID_GROUP, VALID_GROUPING_NAME, publish, due, hide);
+
+        // Assertion
+        assertFalse(result, "A date that doesn't exist should return false");
+        assertTrue(course.getAssessments().isEmpty(), "No assessment should be stored");
+    }
+
+    /*
+     * Test Case 11 - time outside the 24-hour clock (Condition 10, test data 2 of 2).
+     * Test data: due date "15/11/2026 24:00". Hours only go from 00 to 23,
+     * so 24 is one past the highest allowed value.
+     * Expected result: false, and nothing is added.
+     */
+    @Test
+    @DisplayName("Test Case 11 (data 2/2): hour 24 is rejected (Condition 10)")
+    void hourTwentyFourIsRejected() {
+        // Setup
+        String due = "15/11/2026 24:00";
+
+        // Precondition
+        assertTrue(course.getAssessments().isEmpty(), "Precondition: course should start empty");
+        assertEquals(16, due.length(), "Precondition: date should have the DD/MM/YYYY hh:mm length");
+
+        // Call
+        boolean result = course.createNewAssessment(VALID_NAME, VALID_DESCRIPTION, VALID_POINTS,
+                VALID_SUBMISSION_TYPE, VALID_GROUP, VALID_GROUPING_NAME, VALID_PUBLISH, due, VALID_HIDE);
+
+        // Assertion
+        assertFalse(result, "Hour 24 should return false");
+        assertTrue(course.getAssessments().isEmpty(), "No assessment should be stored");
+    }
+
+    /*
+     * Test Case 12 - due date not after publish date (Condition 11, test data 1 of 2).
+     * Test data: due date "01/11/2026 09:00", exactly the same as the publish date.
+     * Equal times are the boundary, because the due date has to be after it.
+     * Expected result: false, and nothing is added.
+     */
+    @Test
+    @DisplayName("Test Case 12 (data 1/2): due date equal to publish date is rejected (Condition 11)")
+    void dueSameAsPublishIsRejected() {
+        // Setup
+        String due = "01/11/2026 09:00";
+
+        // Precondition
+        assertTrue(course.getAssessments().isEmpty(), "Precondition: course should start empty");
+        assertEquals(VALID_PUBLISH, due, "Precondition: due date should equal the publish date");
+
+        // Call
+        boolean result = course.createNewAssessment(VALID_NAME, VALID_DESCRIPTION, VALID_POINTS,
+                VALID_SUBMISSION_TYPE, VALID_GROUP, VALID_GROUPING_NAME, VALID_PUBLISH, due, VALID_HIDE);
+
+        // Assertion
+        assertFalse(result, "A due date that isn't after the publish date should return false");
+        assertTrue(course.getAssessments().isEmpty(), "No assessment should be stored");
+    }
+
+    /*
+     * Test Case 12 - hide date not after due date (Condition 11, test data 2 of 2).
+     * Test data: hide date "15/11/2026 23:59", exactly the same as the due date.
+     * Expected result: false, and nothing is added.
+     */
+    @Test
+    @DisplayName("Test Case 12 (data 2/2): hide date equal to due date is rejected (Condition 11)")
+    void hideSameAsDueIsRejected() {
+        // Setup
+        String hide = "15/11/2026 23:59";
+
+        // Precondition
+        assertTrue(course.getAssessments().isEmpty(), "Precondition: course should start empty");
+        assertEquals(VALID_DUE, hide, "Precondition: hide date should equal the due date");
+
+        // Call
+        boolean result = course.createNewAssessment(VALID_NAME, VALID_DESCRIPTION, VALID_POINTS,
+                VALID_SUBMISSION_TYPE, VALID_GROUP, VALID_GROUPING_NAME, VALID_PUBLISH, VALID_DUE, hide);
+
+        // Assertion
+        assertFalse(result, "A hide date that isn't after the due date should return false");
+        assertTrue(course.getAssessments().isEmpty(), "No assessment should be stored");
+    }
 
     // =========================================================================
     // Shared helpers (Inderjit Sidhu) - available to every member's tests
